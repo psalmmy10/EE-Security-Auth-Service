@@ -2,7 +2,7 @@
 
 # EE Security Auth Service
 
-**Enterprise-grade authentication for Banffpay — OAuth2/JWT, role-based access, and end-to-end encrypted payloads.**
+**Enterprise-grade authentication for pay — OAuth2/JWT, role-based access, and end-to-end encrypted payloads.**
 
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
@@ -26,7 +26,7 @@
 
 ## Overview
 
-This service signs users up, logs them in and out, and issues the tokens every other Banffpay service trusts. It is **its own OAuth2-style token issuer** — no Keycloak, Auth0 or external identity server — and it **encrypts every request and response body end to end**, on top of HTTPS.
+This service signs users up, logs them in and out, and issues the tokens every other pay service trusts. It is **its own OAuth2-style token issuer** — no Keycloak, Auth0 or external identity server — and it **encrypts every request and response body end to end**, on top of HTTPS.
 
 <table>
 <tr>
@@ -79,7 +79,7 @@ PostgreSQL and the service start together on the `dev` profile at **http://local
 
 ### Option B — IntelliJ / Maven
 
-1. Create database `banffpay_auth` with user and password `banffpay_auth`.
+1. Create database `pay_auth` with user and password `pay_auth`.
 2. Keep `spring.profiles.active=dev` in `application.properties`.
 3. Run `AuthServiceApplication` or:
 
@@ -91,7 +91,7 @@ You should see:
 
 ```text
 The following 1 profile is active: "dev"
-Bootstrap administrator created: ad****@banffpay.local
+Bootstrap administrator created: ad****@pay.local
 Started AuthServiceApplication in ... seconds
 ```
 
@@ -103,7 +103,7 @@ java tools/E2EClient.java                             # signup → login → /me
 ```
 
 > [!TIP]
-> Dev admin: `admin@banffpay.local` / `DevAdmin#Password2026`. Dev keys are in-memory, so tokens reset on every restart.
+> Dev admin: `admin@pay.local` / `DevAdmin#Password2026`. Dev keys are in-memory, so tokens reset on every restart.
 
 ---
 
@@ -185,7 +185,7 @@ EE-Security-Auth-Service/
 │   └── generate-keys.sh            # creates the PKCS#12 keystore
 ├── tools/
 │   ├── E2EClient.java              # encrypted test client
-│   └── Banffpay-Auth-E2E.postman_collection.json
+│   └── pay-Auth-E2E.postman_collection.json
 ├── docs/
 │   └── e2e-client-example.js       # encryption flow for web/JS clients
 └── src/main/
@@ -323,12 +323,12 @@ keytool -genkeypair -alias jwt-signing        -keyalg RSA -keysize 3072 -validit
 keytool -genkeypair -alias payload-encryption -keyalg RSA -keysize 3072 -validity 365 -dname "CN=auth-e2e" -storetype PKCS12 -keystore secrets/auth-keys.p12 -storepass "<password>" -keypass "<password>"
 ```
 
-**The issuer** is just the label in each token's `iss` claim — this service signs its own tokens, so there is no separate JWT server. Use the service's public URL (`http://localhost:8080` in dev, `https://auth.banffpay.com` in prod). It must be `https://` outside dev and need not serve anything.
+**The issuer** is just the label in each token's `iss` claim — this service signs its own tokens, so there is no separate JWT server. Use the service's public URL (`http://localhost:8080` in dev, `https://auth.pay.com` in prod). It must be `https://` outside dev and need not serve anything.
 
 **JWKS** — `GET /oauth2/jwks` publishes the public signing key, so any Spring service can validate tokens with no shared secret:
 
 ```properties
-spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://auth.banffpay.com/oauth2/jwks
+spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://auth.pay.com/oauth2/jwks
 ```
 
 - **RS256, not HMAC** — only this service can sign; with a shared secret, every verifier could forge tokens.
@@ -365,7 +365,7 @@ spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://auth.banffpay.com/
 <summary><b>Login</b> — <code>POST /api/v1/auth/login</code></summary>
 
 ```json
-{ "email": "admin@banffpay.local", "password": "DevAdmin#Password2026" }
+{ "email": "admin@pay.local", "password": "DevAdmin#Password2026" }
 ```
 
 ```mermaid
@@ -570,7 +570,7 @@ org.springframework.boot.diagnostics.FailureAnalyzer=com.pay.auth.config.Startup
 The properties files never contain secrets or server-specific values. Instead they reference **environment variables** with the syntax `${VARIABLE:default}`:
 
 ```properties
-spring.datasource.password=${DB_PASSWORD:banffpay_auth}   # dev: falls back to a local default
+spring.datasource.password=${DB_PASSWORD:pay_auth}   # dev: falls back to a local default
 spring.datasource.password=${DB_PASSWORD}                 # prod: no default — must be set
 ```
 
@@ -588,25 +588,25 @@ A **`.env` file** is simply a text file of `KEY=value` lines in the project root
 |---|---|:-:|:-:|:-:|---|
 | `SPRING_PROFILES_ACTIVE` | Which environment runs (overrides `spring.profiles.active`) | ➖ `dev` | ✅ | ✅ | `prod` |
 | `SERVER_PORT` | HTTP port | ➖ `8080` | ➖ `8080` | ➖ `8080` | `8080` |
-| `DB_URL` | JDBC URL of the PostgreSQL database | ➖ `jdbc:postgresql://localhost:5432/banffpay_auth` | ✅ | ✅ | `jdbc:postgresql://db.internal:5432/banffpay_auth` |
-| `DB_USERNAME` | Database user | ➖ `banffpay_auth` | ✅ | ✅ | `banffpay_auth` |
-| `DB_PASSWORD` 🔐 | Database password | ➖ `banffpay_auth` | ✅ | ✅ | `<strong password>` |
+| `DB_URL` | JDBC URL of the PostgreSQL database | ➖ `jdbc:postgresql://localhost:5432/pay_auth` | ✅ | ✅ | `jdbc:postgresql://db.internal:5432/pay_auth` |
+| `DB_USERNAME` | Database user | ➖ `pay_auth` | ✅ | ✅ | `pay_auth` |
+| `DB_PASSWORD` 🔐 | Database password | ➖ `pay_auth` | ✅ | ✅ | `<strong password>` |
 | `DB_POOL_MAX` | Max pooled DB connections | ➖ `20` | ➖ `20` | ➖ `20` | `30` |
-| `JWT_ISSUER` | `iss` claim — this service's public URL (`https://` outside dev) | fixed `http://localhost:8080` | ➖ `https://auth-staging.banffpay.com` | ✅ | `https://auth.banffpay.com` |
-| `JWT_AUDIENCE` | `aud` claim — who tokens are for | fixed `banffpay-api-dev` | ➖ `banffpay-api-staging` | ✅ | `banffpay-api` |
-| `CORS_ALLOWED_ORIGINS` | Browser origins allowed to call the API, comma-separated | fixed `localhost:3000/5173` | ✅ | ✅ | `https://app.banffpay.com` |
+| `JWT_ISSUER` | `iss` claim — this service's public URL (`https://` outside dev) | fixed `http://localhost:8080` | ➖ `https://auth-staging.pay.com` | ✅ | `https://auth.pay.com` |
+| `JWT_AUDIENCE` | `aud` claim — who tokens are for | fixed `pay-api-dev` | ➖ `pay-api-staging` | ✅ | `pay-api` |
+| `CORS_ALLOWED_ORIGINS` | Browser origins allowed to call the API, comma-separated | fixed `localhost:3000/5173` | ✅ | ✅ | `https://app.pay.com` |
 | `KEY_SOURCE` | `ephemeral` (in-memory) or `keystore` | ➖ `ephemeral` | fixed `keystore` | fixed `keystore` | `keystore` |
 | `KEYSTORE_LOCATION` | Path to the PKCS#12 keystore (`file:` prefix) | with `KEY_SOURCE=keystore` | ➖ `file:/run/secrets/auth-keys.p12` | ➖ same | `file:./secrets/auth-keys.p12` |
 | `KEYSTORE_PASSWORD` 🔐 | Password chosen when creating the keystore | with `KEY_SOURCE=keystore` | ✅ | ✅ | `<keystore password>` |
 | `PASSWORD_HASH_CONCURRENCY` | Max simultaneous BCrypt hashes (`0` = CPU cores) | ➖ `0` | ➖ `0` | ➖ `0` | `8` |
 | `E2E_ENABLED` | Turn payload encryption off for plain-JSON testing | ➖ `true` | not allowed | not allowed | `false` (dev only) |
 | `ADMIN_BOOTSTRAP_ENABLED` | Create the first admin at startup | fixed `true` | ➖ `false` | ➖ `false` | `true` (first deploy only) |
-| `ADMIN_BOOTSTRAP_EMAIL` | First admin's email | ➖ `admin@banffpay.local` | ✅ if bootstrap on | ✅ if bootstrap on | `it-admin@banffpay.com` |
+| `ADMIN_BOOTSTRAP_EMAIL` | First admin's email | ➖ `admin@pay.local` | ✅ if bootstrap on | ✅ if bootstrap on | `it-admin@pay.com` |
 | `ADMIN_BOOTSTRAP_PASSWORD` 🔐 | First admin's password (≥ 16 characters) | ➖ `DevAdmin#Password2026` | ✅ if bootstrap on | ✅ if bootstrap on | `<long random password>` |
 
 "fixed" means the value is hard-set in that profile's properties file and the variable isn't read there.
 
-Two more are read only by `docker-compose.prod.yml`, not by Spring: `AUTH_IMAGE` (image to run, e.g. `banffpay-auth:1.0.0`) and `KEYSTORE_HOST_PATH` (keystore file on the host, e.g. `./secrets/auth-keys.p12`).
+Two more are read only by `docker-compose.prod.yml`, not by Spring: `AUTH_IMAGE` (image to run, e.g. `pay-auth:1.0.0`) and `KEYSTORE_HOST_PATH` (keystore file on the host, e.g. `./secrets/auth-keys.p12`).
 
 ---
 
@@ -616,14 +616,14 @@ Work through these in order — each level adds one thing. All values below are 
 
 #### Level 1 — Just run it (nothing to set)
 
-The `dev` profile has defaults for everything. You only need PostgreSQL with database, user and password all `banffpay_auth`:
+The `dev` profile has defaults for everything. You only need PostgreSQL with database, user and password all `pay_auth`:
 
 ```powershell
 docker compose up -d postgres      # or use your own local PostgreSQL
 mvn spring-boot:run
 ```
 
-You're using: in-memory keys, E2E **on**, admin `admin@banffpay.local` / `DevAdmin#Password2026`. Test with `java tools/E2EClient.java`.
+You're using: in-memory keys, E2E **on**, admin `admin@pay.local` / `DevAdmin#Password2026`. Test with `java tools/E2EClient.java`.
 
 #### Level 2 — Plain JSON for Postman (one variable)
 
@@ -677,11 +677,11 @@ Runs the real staging rules (keystore required, E2E forced on, `https` issuer, s
 | Variable | Value |
 |---|---|
 | `SPRING_PROFILES_ACTIVE` | `staging` |
-| `DB_URL` | `jdbc:postgresql://localhost:5432/banffpay_auth` |
-| `DB_USERNAME` | `banffpay_auth` |
-| `DB_PASSWORD` | `banffpay_auth` |
-| `JWT_ISSUER` | `https://auth-staging.banffpay.com` |
-| `CORS_ALLOWED_ORIGINS` | `https://app-staging.banffpay.com` |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/pay_auth` |
+| `DB_USERNAME` | `pay_auth` |
+| `DB_PASSWORD` | `pay_auth` |
+| `JWT_ISSUER` | `https://auth-staging.pay.com` |
+| `CORS_ALLOWED_ORIGINS` | `https://app-staging.pay.com` |
 | `KEYSTORE_LOCATION` | `file:./secrets/auth-keys.p12` |
 | `KEYSTORE_PASSWORD` | `TestKeystore#2026` |
 
@@ -708,11 +708,11 @@ KEYSTORE_PASSWORD=TestKeystore#2026
 
 ```dotenv
 SPRING_PROFILES_ACTIVE=staging
-DB_URL=jdbc:postgresql://localhost:5432/banffpay_auth
-DB_USERNAME=banffpay_auth
-DB_PASSWORD=banffpay_auth
-JWT_ISSUER=https://auth-staging.banffpay.com
-CORS_ALLOWED_ORIGINS=https://app-staging.banffpay.com
+DB_URL=jdbc:postgresql://localhost:5432/pay_auth
+DB_USERNAME=pay_auth
+DB_PASSWORD=pay_auth
+JWT_ISSUER=https://auth-staging.pay.com
+CORS_ALLOWED_ORIGINS=https://app-staging.pay.com
 KEYSTORE_LOCATION=file:./secrets/auth-keys.p12
 KEYSTORE_PASSWORD=TestKeystore#2026
 ```
@@ -780,13 +780,13 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d
 ```dotenv
 SPRING_PROFILES_ACTIVE=staging
 
-DB_URL=jdbc:postgresql://<staging-db-host>:5432/banffpay_auth
-DB_USERNAME=banffpay_auth
+DB_URL=jdbc:postgresql://<staging-db-host>:5432/pay_auth
+DB_USERNAME=pay_auth
 DB_PASSWORD=<staging db password>
 
-JWT_ISSUER=https://auth-staging.banffpay.com
-JWT_AUDIENCE=banffpay-api-staging
-CORS_ALLOWED_ORIGINS=https://app-staging.banffpay.com
+JWT_ISSUER=https://auth-staging.pay.com
+JWT_AUDIENCE=pay-api-staging
+CORS_ALLOWED_ORIGINS=https://app-staging.pay.com
 
 KEYSTORE_LOCATION=file:/run/secrets/auth-keys.p12
 KEYSTORE_PASSWORD=<staging keystore password>
@@ -797,7 +797,7 @@ ADMIN_BOOTSTRAP_EMAIL=<admin email>
 ADMIN_BOOTSTRAP_PASSWORD=<at least 16 characters>
 
 # Docker compose only
-AUTH_IMAGE=banffpay-auth:latest
+AUTH_IMAGE=pay-auth:latest
 KEYSTORE_HOST_PATH=./secrets/auth-keys.p12
 ```
 
@@ -809,14 +809,14 @@ KEYSTORE_HOST_PATH=./secrets/auth-keys.p12
 ```dotenv
 SPRING_PROFILES_ACTIVE=prod
 
-DB_URL=jdbc:postgresql://<prod-db-host>:5432/banffpay_auth
-DB_USERNAME=banffpay_auth
+DB_URL=jdbc:postgresql://<prod-db-host>:5432/pay_auth
+DB_USERNAME=pay_auth
 DB_PASSWORD=<prod db password>
 DB_POOL_MAX=20
 
-JWT_ISSUER=https://auth.banffpay.com
-JWT_AUDIENCE=banffpay-api
-CORS_ALLOWED_ORIGINS=https://app.banffpay.com
+JWT_ISSUER=https://auth.pay.com
+JWT_AUDIENCE=pay-api
+CORS_ALLOWED_ORIGINS=https://app.pay.com
 
 KEYSTORE_LOCATION=file:/run/secrets/auth-keys.p12
 KEYSTORE_PASSWORD=<prod keystore password>
@@ -826,7 +826,7 @@ ADMIN_BOOTSTRAP_EMAIL=
 ADMIN_BOOTSTRAP_PASSWORD=
 
 # Docker compose only
-AUTH_IMAGE=banffpay-auth:1.0.0
+AUTH_IMAGE=pay-auth:1.0.0
 KEYSTORE_HOST_PATH=./secrets/auth-keys.p12
 ```
 
@@ -902,7 +902,7 @@ Search the server log for the `correlationId` to find the real cause. Messages a
 
 </details>
 
-**Sensitive data never reaches logs:** DTO `toString()` masks passwords and tokens, emails are masked (`ka****@banffpay.com`), user agents are sanitised, and `server.error.include-*` is `never`.
+**Sensitive data never reaches logs:** DTO `toString()` masks passwords and tokens, emails are masked (`ka****@pay.com`), user agents are sanitised, and `server.error.include-*` is `never`.
 
 **Audit trail:** signup, login success/failure, lockout, logout, refresh, token reuse, status and role changes, and admin bootstrap are written to `audit_logs` asynchronously via Spring events.
 
@@ -924,7 +924,7 @@ Each step prints the plaintext (password masked), the ciphertext actually sent, 
 ### Postman (encrypted)
 
 1. Postman **v11+** (scripts load `node-forge` via `pm.require`).
-2. Import `tools/Banffpay-Auth-E2E.postman_collection.json`.
+2. Import `tools/pay-Auth-E2E.postman_collection.json`.
 3. Write normal JSON — collection scripts encrypt requests and decrypt responses.
 4. Decrypted replies appear in the **Visualize** tab and the **Console**; tokens are saved automatically.
 
@@ -1047,5 +1047,5 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d
 ---
 
 <div align="center">
-<sub>Built for Banffpay · Java 21 · Spring Boot 3.3 · Secure by default</sub>
+<sub>Built for pay · Java 21 · Spring Boot 3.3 · Secure by default</sub>
 </div>
