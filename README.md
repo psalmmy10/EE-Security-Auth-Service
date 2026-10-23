@@ -1,4 +1,4 @@
-# Banffpay Auth Service
+# Pay Auth Service
 
 Spring Boot 3.3 / Java 21 authentication service. It provides:
 
@@ -15,7 +15,7 @@ Spring Boot 3.3 / Java 21 authentication service. It provides:
 ## Package structure
 
 ```
-com.banffpay.auth
+com.pay.auth
 ├── config/                 Async (virtual threads), scheduling, JPA auditing, clock, MVC, admin bootstrap
 │   └── properties/         Typed, validated @ConfigurationProperties records
 ├── constant/               ApiPaths, SecurityConstants
