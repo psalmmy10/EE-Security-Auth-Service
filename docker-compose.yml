@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: banffpay_auth
+      POSTGRES_USER: banffpay_auth
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - auth-pgdata:/var/lib/postgresql/data
+volumes:
+  auth-pgdata:

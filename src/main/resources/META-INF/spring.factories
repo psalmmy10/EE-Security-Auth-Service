@@ -1,0 +1,2 @@
+org.springframework.boot.env.EnvironmentPostProcessor=com.pay.auth.config.ProfileGuardEnvironmentPostProcessor
+org.springframework.boot.diagnostics.FailureAnalyzer=com.pay.auth.config.StartupFailureAnalyzer

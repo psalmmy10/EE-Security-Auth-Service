@@ -1,0 +1,16 @@
+package com.pay.auth.constant.enums;
+
+public enum AuditEventType {
+    SIGNUP_SUCCESS,
+    LOGIN_SUCCESS,
+    LOGIN_FAILURE,
+    ACCOUNT_LOCKED,
+    LOGOUT,
+    LOGOUT_ALL,
+    TOKEN_REFRESHED,
+    TOKEN_REUSE_DETECTED,
+    USER_STATUS_CHANGED,
+    ROLE_ASSIGNED,
+    ROLE_REVOKED,
+    ADMIN_BOOTSTRAPPED
+}
