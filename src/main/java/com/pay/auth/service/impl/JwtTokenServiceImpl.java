@@ -3,7 +3,7 @@ package com.pay.auth.service.impl;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.pay.auth.config.properties.JwtProperties;
 import com.pay.auth.constant.SecurityConstants;
-import com.pay.auth.entity.User;
+import com.pay.auth.dao.entity.User;
 import com.pay.auth.model.AccessToken;
 import com.pay.auth.service.TokenService;
 import com.pay.auth.util.CryptoUtil;

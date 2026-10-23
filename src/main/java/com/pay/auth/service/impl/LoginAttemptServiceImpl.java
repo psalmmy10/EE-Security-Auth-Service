@@ -6,7 +6,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.pay.auth.config.properties.LockoutProperties;
-import com.pay.auth.dao.UserRepository;
+import com.pay.auth.dao.repository.UserRepository;
 import com.pay.auth.service.LoginAttemptService;
 
 import java.time.Clock;

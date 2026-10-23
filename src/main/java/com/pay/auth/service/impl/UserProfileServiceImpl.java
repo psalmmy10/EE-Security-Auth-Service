@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.pay.auth.dao.UserRepository;
+import com.pay.auth.dao.repository.UserRepository;
 import com.pay.auth.dto.res.UserResponse;
 import com.pay.auth.exception.ResourceNotFoundException;
 import com.pay.auth.mapper.UserMapper;

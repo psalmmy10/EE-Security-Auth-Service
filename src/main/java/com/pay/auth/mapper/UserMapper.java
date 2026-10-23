@@ -2,9 +2,9 @@ package com.pay.auth.mapper;
 
 import org.springframework.stereotype.Component;
 
+import com.pay.auth.dao.entity.Role;
+import com.pay.auth.dao.entity.User;
 import com.pay.auth.dto.res.UserResponse;
-import com.pay.auth.entity.Role;
-import com.pay.auth.entity.User;
 
 /**
  * Entity -&gt; DTO boundary. Entities never leave the service layer, which guarantees the

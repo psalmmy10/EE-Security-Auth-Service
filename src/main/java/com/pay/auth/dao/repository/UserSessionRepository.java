@@ -1,4 +1,4 @@
-package com.pay.auth.dao;
+package com.pay.auth.dao.repository;
 
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.pay.auth.constant.enums.RevocationReason;
-import com.pay.auth.entity.UserSession;
+import com.pay.auth.dao.entity.UserSession;
 
 import java.time.Instant;
 import java.util.Optional;

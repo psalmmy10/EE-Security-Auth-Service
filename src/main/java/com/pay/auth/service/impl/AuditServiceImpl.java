@@ -1,8 +1,8 @@
 package com.pay.auth.service.impl;
 
 import com.pay.auth.event.AuthAuditEvent;
-import com.pay.auth.dao.AuditLogRepository;
-import com.pay.auth.entity.AuditLog;
+import com.pay.auth.dao.entity.AuditLog;
+import com.pay.auth.dao.repository.AuditLogRepository;
 import com.pay.auth.service.AuditService;
 
 import lombok.RequiredArgsConstructor;

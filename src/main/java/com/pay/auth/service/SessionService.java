@@ -3,7 +3,7 @@ package com.pay.auth.service;
 import java.util.UUID;
 
 import com.pay.auth.constant.enums.RevocationReason;
-import com.pay.auth.entity.User;
+import com.pay.auth.dao.entity.User;
 import com.pay.auth.model.AuthenticatedSession;
 import com.pay.auth.model.ClientContext;
 import com.pay.auth.model.IssuedTokens;

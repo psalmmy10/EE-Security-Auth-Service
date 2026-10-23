@@ -2,7 +2,7 @@ package com.pay.auth.service;
 
 import java.time.Instant;
 
-import com.pay.auth.entity.User;
+import com.pay.auth.dao.entity.User;
 import com.pay.auth.model.AccessToken;
 
 /** Token minting only — no persistence, no policy. Swappable (e.g. for an external AS). */

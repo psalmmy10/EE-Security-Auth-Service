@@ -24,7 +24,7 @@ public class UserController {
 
     private final UserProfileService userProfileService;
 
-    /** Identity comes from the verified token only — never from a path/query parameter (no IDOR). */
+    /** Identity comes from the verified token only — not from a path/query parameter (no IDOR). */
     @GetMapping("/me")
     @PreAuthorize("hasAuthority('PROFILE_READ')")
     public ResponseEntity<ApiResponse<UserResponse>> me(@AuthenticationPrincipal Jwt jwt) {

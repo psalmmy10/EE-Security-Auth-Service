@@ -6,10 +6,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.pay.auth.config.properties.JwtProperties;
 import com.pay.auth.constant.enums.RevocationReason;
-import com.pay.auth.dao.UserRepository;
-import com.pay.auth.dao.UserSessionRepository;
-import com.pay.auth.entity.User;
-import com.pay.auth.entity.UserSession;
+import com.pay.auth.dao.entity.User;
+import com.pay.auth.dao.entity.UserSession;
+import com.pay.auth.dao.repository.UserRepository;
+import com.pay.auth.dao.repository.UserSessionRepository;
 import com.pay.auth.exception.InvalidTokenException;
 import com.pay.auth.exception.TokenReuseDetectedException;
 import com.pay.auth.model.AccessToken;

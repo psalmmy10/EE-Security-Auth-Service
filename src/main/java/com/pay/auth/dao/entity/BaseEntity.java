@@ -1,4 +1,4 @@
-package com.pay.auth.entity;
+package com.pay.auth.dao.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;

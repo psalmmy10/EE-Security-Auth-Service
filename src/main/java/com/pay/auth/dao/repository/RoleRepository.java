@@ -1,9 +1,9 @@
-package com.pay.auth.dao;
+package com.pay.auth.dao.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.pay.auth.constant.enums.RoleName;
-import com.pay.auth.entity.Role;
+import com.pay.auth.dao.entity.Role;
 
 import java.util.Optional;
 import java.util.UUID;

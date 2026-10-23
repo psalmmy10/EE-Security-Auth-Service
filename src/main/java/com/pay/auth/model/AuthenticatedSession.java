@@ -1,6 +1,6 @@
 package com.pay.auth.model;
 
-import com.pay.auth.entity.User;
+import com.pay.auth.dao.entity.User;
 
 public record AuthenticatedSession(User user, IssuedTokens tokens) {
 

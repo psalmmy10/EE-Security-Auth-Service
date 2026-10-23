@@ -1,4 +1,4 @@
-package com.pay.auth.entity;
+package com.pay.auth.dao.entity;
 
 import com.pay.auth.constant.enums.PermissionName;
 
