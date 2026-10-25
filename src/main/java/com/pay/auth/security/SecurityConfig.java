@@ -51,9 +51,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Value("${app.security.e2e.swagger-test-enabled:false}")
-    private boolean swaggerTestEnabled;
-
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final CorsProperties corsProperties;
@@ -134,13 +131,8 @@ public class SecurityConfig {
                 SecurityConstants.HEADER_E2E_TIMESTAMP, SecurityConstants.HEADER_E2E_NONCE,
                 SecurityConstants.HEADER_CORRELATION_ID));
 
-        if (swaggerTestEnabled) {
-           exposedHeaders.add("X-E2E-Request-Nonce");
-        }
-
         config.setExposedHeaders(
-                // List.of(SecurityConstants.HEADER_E2E_ENCRYPTED, SecurityConstants.HEADER_CORRELATION_ID)
-                exposedHeaders  
+                List.of(SecurityConstants.HEADER_E2E_ENCRYPTED, SecurityConstants.HEADER_CORRELATION_ID)
         );
         config.setAllowCredentials(false);
         config.setMaxAge(3600L);

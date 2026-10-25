@@ -19,9 +19,7 @@ import com.pay.auth.constant.SecurityConstants;
 @RequiredArgsConstructor
 public class E2EEnforcementInterceptor implements HandlerInterceptor {
 
-    
-@Value("${app.security.e2e.swagger-test-enabled:false}")
-private boolean swaggerTestEnabled;
+
 
     private final E2ESessionKeyResolver keyResolver;
     private final E2EProperties properties;
