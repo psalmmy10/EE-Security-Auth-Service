@@ -9,7 +9,7 @@ read -rsp "Keystore password: " PASS; echo
 
 for ALIAS in jwt-signing payload-encryption; do
   keytool -genkeypair -alias "$ALIAS" -keyalg RSA -keysize 3072 -sigalg SHA256withRSA \
-    -validity 365 -dname "CN=banffpay-auth-${ALIAS}" \
+    -validity 365 -dname "CN=pay-auth-${ALIAS}" \
     -storetype PKCS12 -keystore "$KEYSTORE" -storepass "$PASS" -keypass "$PASS"
 done
 chmod 600 "$KEYSTORE"

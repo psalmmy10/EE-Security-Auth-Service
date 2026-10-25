@@ -5,6 +5,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.beans.factory.annotation.Value;
+import java.util.ArrayList;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -49,9 +51,19 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+    @Value("${app.security.e2e.swagger-test-enabled:false}")
+    private boolean swaggerTestEnabled;
+
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final CorsProperties corsProperties;
+
+
+    List<String> exposedHeaders = new ArrayList<>(List.of(
+                SecurityConstants.HEADER_E2E_ENCRYPTED,
+                SecurityConstants.HEADER_CORRELATION_ID
+        ));
+    
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder,
@@ -65,15 +77,38 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .headers(headers -> headers
-                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                // "default-src 'none'; frame-ancestors 'none'"
+                                "default-src 'self'; script-src 'self'; style-src 'self'; " +
+                                "connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'"
+                        ))
                         .frameOptions(frame -> frame.deny())
                         .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
                         .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31_536_000)))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(SecurityConstants.publicEndpoints()).permitAll()
-                        .requestMatchers(ApiPaths.ADMIN + "/**").hasRole(RoleName.ADMIN.name())
-                        .anyRequest().authenticated())
+                // .authorizeHttpRequests(auth -> auth
+                //         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                //         .requestMatchers(SecurityConstants.publicEndpoints()).permitAll()
+                //         .requestMatchers(ApiPaths.ADMIN + "/**").hasRole(RoleName.ADMIN.name())
+                //         .anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> {
+                        auth.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+                        auth.requestMatchers(SecurityConstants.publicEndpoints()).permitAll();
+
+                        if (swaggerTestEnabled) {
+                                auth.requestMatchers(
+                                        "/e2e-swagger.html",
+                                        "/e2e-swagger.js",
+                                        "/swagger-ui.html",
+                                        "/swagger-ui/**",
+                                        "/v3/api-docs/**"
+                                ).permitAll();
+                        }
+
+                        auth.requestMatchers(ApiPaths.ADMIN + "/**")
+                                .hasRole(RoleName.ADMIN.name());
+
+                        auth.anyRequest().authenticated();
+                        })
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.decoder(jwtDecoder).jwtAuthenticationConverter(jwtAuthenticationConverter))
                         .authenticationEntryPoint(authenticationEntryPoint)
@@ -118,7 +153,15 @@ public class SecurityConfig {
                 SecurityConstants.HEADER_E2E_KEY, SecurityConstants.HEADER_E2E_KEY_ID,
                 SecurityConstants.HEADER_E2E_TIMESTAMP, SecurityConstants.HEADER_E2E_NONCE,
                 SecurityConstants.HEADER_CORRELATION_ID));
-        config.setExposedHeaders(List.of(SecurityConstants.HEADER_E2E_ENCRYPTED, SecurityConstants.HEADER_CORRELATION_ID));
+
+        if (swaggerTestEnabled) {
+           exposedHeaders.add("X-E2E-Request-Nonce");
+        }
+
+        config.setExposedHeaders(
+                // List.of(SecurityConstants.HEADER_E2E_ENCRYPTED, SecurityConstants.HEADER_CORRELATION_ID)
+                exposedHeaders  
+        );
         config.setAllowCredentials(false);
         config.setMaxAge(3600L);
 

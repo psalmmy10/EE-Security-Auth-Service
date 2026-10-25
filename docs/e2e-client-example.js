@@ -1,5 +1,5 @@
 /**
- * Reference browser/Node 20+ client for the Banffpay E2E envelope (WebCrypto only, no deps).
+ * Reference browser/Node 20+ client for the Pay E2E envelope (WebCrypto only, no deps).
  *
  * Per request:
  *   1. random AES-256 key K, wrapped with the server RSA key (RSA-OAEP, SHA-256)
