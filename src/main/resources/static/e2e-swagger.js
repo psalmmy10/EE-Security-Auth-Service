@@ -322,7 +322,6 @@
 
         const plaintext = decoder.decode(plaintextBuffer);
 
-        // Replace the encrypted envelope with the decoded API response.
         response.text = plaintext;
         response.data = JSON.parse(plaintext);
         response.body = response.data;
