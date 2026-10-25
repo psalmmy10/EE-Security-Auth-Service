@@ -19,9 +19,7 @@ import com.pay.auth.constant.SecurityConstants;
 @RequiredArgsConstructor
 public class E2EEnforcementInterceptor implements HandlerInterceptor {
 
-    
-@Value("${app.security.e2e.swagger-test-enabled:false}")
-private boolean swaggerTestEnabled;
+
 
     private final E2ESessionKeyResolver keyResolver;
     private final E2EProperties properties;
@@ -39,13 +37,6 @@ private boolean swaggerTestEnabled;
 
         }
 
-
-        if (swaggerTestEnabled) {
-            response.setHeader(
-                    "X-E2E-Request-Nonce",
-                    request.getHeader(SecurityConstants.HEADER_E2E_NONCE)
-            );
-        }
 
         // response.setHeader(
         //         "X-E2E-Request-Nonce",

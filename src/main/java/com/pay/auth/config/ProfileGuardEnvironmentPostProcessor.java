@@ -60,13 +60,13 @@
 //         String issuer = environment.getProperty("app.security.jwt.issuer", "");
 //         require(issuer.startsWith("https://"),
 //                 profile + " requires an https:// JWT issuer, but it is '" + issuer + "'.",
-//                 "Set the JWT_ISSUER environment variable, e.g. JWT_ISSUER=https://auth.banffpay.com");
+//                 "Set the JWT_ISSUER environment variable, e.g. JWT_ISSUER=https://auth.pay.com");
 
 //         String origins = environment.getProperty("app.cors.allowed-origins", "");
 //         require(!origins.isBlank() && !origins.contains("localhost") && !origins.contains("127.0.0.1")
 //                         && !origins.contains("*") && !origins.contains("http://"),
 //                 profile + " requires explicit https:// CORS origins, but they are '" + origins + "'.",
-//                 "Set CORS_ALLOWED_ORIGINS, e.g. CORS_ALLOWED_ORIGINS=https://app.banffpay.com");
+//                 "Set CORS_ALLOWED_ORIGINS, e.g. CORS_ALLOWED_ORIGINS=https://app.pay.com");
 //     }
 
 //     private static void require(boolean condition, String description, String action) {
@@ -145,7 +145,7 @@ public class ProfileGuardEnvironmentPostProcessor implements EnvironmentPostProc
         String issuer = environment.getProperty("app.security.jwt.issuer", "");
         require(issuer.startsWith("https://"),
                 profile + " requires an https:// JWT issuer, but it is '" + issuer + "'.",
-                "Set the JWT_ISSUER environment variable, e.g. JWT_ISSUER=https://auth.banffpay.com");
+                "Set the JWT_ISSUER environment variable, e.g. JWT_ISSUER=https://auth.pay.com");
 
         if ("prod".equals(profile)) {
             boolean swaggerOn = Boolean.TRUE.equals(environment.getProperty("springdoc.swagger-ui.enabled", Boolean.class))
@@ -159,7 +159,7 @@ public class ProfileGuardEnvironmentPostProcessor implements EnvironmentPostProc
         require(!origins.isBlank() && !origins.contains("localhost") && !origins.contains("127.0.0.1")
                         && !origins.contains("*") && !origins.contains("http://"),
                 profile + " requires explicit https:// CORS origins, but they are '" + origins + "'.",
-                "Set CORS_ALLOWED_ORIGINS, e.g. CORS_ALLOWED_ORIGINS=https://app.banffpay.com");
+                "Set CORS_ALLOWED_ORIGINS, e.g. CORS_ALLOWED_ORIGINS=https://app.pay.com");
     }
 
     private static void require(boolean condition, String description, String action) {
