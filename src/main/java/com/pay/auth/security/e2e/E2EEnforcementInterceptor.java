@@ -40,13 +40,6 @@ private boolean swaggerTestEnabled;
         }
 
 
-        if (swaggerTestEnabled) {
-            response.setHeader(
-                    "X-E2E-Request-Nonce",
-                    request.getHeader(SecurityConstants.HEADER_E2E_NONCE)
-            );
-        }
-
         // response.setHeader(
         //         "X-E2E-Request-Nonce",
         //         request.getHeader("X-E2E-Nonce")
