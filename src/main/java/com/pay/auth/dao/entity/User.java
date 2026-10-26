@@ -1,5 +1,7 @@
 package com.pay.auth.dao.entity;
 
+import com.pay.auth.constant.enums.RoleName;
+import com.pay.auth.constant.enums.UserStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -20,9 +22,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import com.pay.auth.constant.enums.RoleName;
-import com.pay.auth.constant.enums.UserStatus;
-
 /**
  * Rich domain entity: state changes go through intention-revealing methods instead of
  * public setters, so invariants (e.g. unlocking on reactivation) live in one place.
@@ -30,6 +29,7 @@ import com.pay.auth.constant.enums.UserStatus;
  * User &gt;--&lt; Role is many-to-many. Sessions are mapped only from the session side
  * (unidirectional @ManyToOne) so loading a user never drags its session history along.
  * No Lombok @ToString/@Data: the password hash must never reach a log line.
+ * Spring Security sees this entity only through security.UserPrincipal.
  */
 @Getter
 @Entity

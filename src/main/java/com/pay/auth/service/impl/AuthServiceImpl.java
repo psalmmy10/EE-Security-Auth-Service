@@ -1,16 +1,9 @@
 package com.pay.auth.service.impl;
 
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
-
 import com.pay.auth.constant.SecurityConstants;
 import com.pay.auth.constant.enums.AuditEventType;
 import com.pay.auth.constant.enums.RevocationReason;
 import com.pay.auth.constant.enums.RoleName;
-import com.pay.auth.constant.enums.UserStatus;
 import com.pay.auth.dao.entity.Role;
 import com.pay.auth.dao.entity.User;
 import com.pay.auth.dao.repository.RoleRepository;
@@ -20,6 +13,7 @@ import com.pay.auth.dto.req.RefreshTokenRequest;
 import com.pay.auth.dto.req.SignupRequest;
 import com.pay.auth.dto.res.AuthResponse;
 import com.pay.auth.dto.res.UserResponse;
+import com.pay.auth.security.UserPrincipal;
 import com.pay.auth.event.AuthAuditEvent;
 import com.pay.auth.exception.AccountInactiveException;
 import com.pay.auth.exception.AccountLockedException;
@@ -33,11 +27,21 @@ import com.pay.auth.model.IssuedTokens;
 import com.pay.auth.service.AuthService;
 import com.pay.auth.service.LoginAttemptService;
 import com.pay.auth.service.SessionService;
-import com.pay.auth.util.CryptoUtil;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
+import org.springframework.security.authentication.LockedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -63,13 +67,13 @@ public class AuthServiceImpl implements AuthService {
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
-    /** Compared against when the email is unknown, so both paths cost one BCrypt verification. */
-    private final String timingEqualisationHash;
+    private final AuthenticationManager authenticationManager;
 
     public AuthServiceImpl(UserRepository userRepository, RoleRepository roleRepository,
                            PasswordEncoder passwordEncoder, SessionService sessionService,
                            LoginAttemptService loginAttemptService, UserMapper userMapper,
-                           ApplicationEventPublisher events, TransactionTemplate transactionTemplate, Clock clock) {
+                           ApplicationEventPublisher events, TransactionTemplate transactionTemplate, Clock clock,
+                           AuthenticationManager authenticationManager) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -79,7 +83,7 @@ public class AuthServiceImpl implements AuthService {
         this.events = events;
         this.transactionTemplate = transactionTemplate;
         this.clock = clock;
-        this.timingEqualisationHash = passwordEncoder.encode(CryptoUtil.randomUrlSafeToken(24));
+        this.authenticationManager = authenticationManager;
     }
 
     @Override
@@ -92,33 +96,46 @@ public class AuthServiceImpl implements AuthService {
         return userMapper.toResponse(saved);
     }
 
+    /**
+     * Credentials are verified by Spring's AuthenticationManager (see AuthenticationConfig).
+     * This method only translates the outcome into lockout bookkeeping, audit events and tokens.
+     */
     @Override
     public AuthResponse login(LoginRequest request, ClientContext client) {
         String email = normaliseEmail(request.email());
-        Optional<User> candidate = userRepository.findWithRolesByEmail(email);
-
-        if (candidate.isEmpty()) {
-            passwordEncoder.matches(request.password(), timingEqualisationHash);
-            publish(AuditEventType.LOGIN_FAILURE, null, email, client, "unknown principal");
-            throw new AuthenticationFailedException("unknown principal");
-        }
-
-        User user = candidate.get();
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            boolean lockedNow = loginAttemptService.recordFailure(user.getId());
-            publish(AuditEventType.LOGIN_FAILURE, user.getId(), email, client, "bad credentials");
-            if (lockedNow) {
-                publish(AuditEventType.ACCOUNT_LOCKED, user.getId(), email, client, "failed-attempt threshold reached");
-            }
+        User user;
+        try {
+            Authentication result = authenticationManager.authenticate(
+                    UsernamePasswordAuthenticationToken.unauthenticated(email, request.password()));
+            user = ((UserPrincipal) result.getPrincipal()).user();
+        } catch (BadCredentialsException ex) {             // unknown email OR wrong password — same response
+            recordFailedLogin(email, client);
             throw new AuthenticationFailedException("bad credentials");
+        } catch (LockedException ex) {                     // only reachable with the correct password
+            throw new AccountLockedException("account locked");
+        } catch (DisabledException ex) {                   // only reachable with the correct password
+            throw new AccountInactiveException("account disabled");
+        } catch (InternalAuthenticationServiceException ex) {
+            throw new IllegalStateException("authentication backend failure", ex.getCause());
         }
 
-        // Account state is only revealed to someone who already proved knowledge of the password.
-        assertCanAuthenticate(user, clock.instant());
         loginAttemptService.recordSuccess(user.getId());
         IssuedTokens tokens = sessionService.openSession(user, client);
         publish(AuditEventType.LOGIN_SUCCESS, user.getId(), email, client, null);
         return toAuthResponse(user, tokens);
+    }
+
+    private void recordFailedLogin(String email, ClientContext client) {
+        Optional<UUID> userId = userRepository.findIdByEmail(email);
+        if (userId.isEmpty()) {
+            publish(AuditEventType.LOGIN_FAILURE, null, email, client, "unknown principal");
+            return;
+        }
+        boolean lockedNow = loginAttemptService.recordFailure(userId.get());
+        publish(AuditEventType.LOGIN_FAILURE, userId.get(), email, client, "bad credentials");
+        if (lockedNow) {
+            publish(AuditEventType.ACCOUNT_LOCKED, userId.get(), email, client, "failed-attempt threshold reached");
+        }
     }
 
     @Override
@@ -157,15 +174,6 @@ public class AuthServiceImpl implements AuthService {
         } catch (DataIntegrityViolationException ex) {
             // Concurrent signup with the same email lost the race against the unique constraint.
             throw new RegistrationConflictException("unique constraint violation on email", ex);
-        }
-    }
-
-    private void assertCanAuthenticate(User user, Instant now) {
-        if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new AccountInactiveException("account status " + user.getStatus());
-        }
-        if (user.isTemporarilyLocked(now)) {
-            throw new AccountLockedException("account locked until " + user.getLockedUntil());
         }
     }
 
