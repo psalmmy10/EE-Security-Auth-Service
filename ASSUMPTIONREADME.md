@@ -56,10 +56,10 @@ This decision is valid **only while these assumptions hold**. Each one is a revi
 | # | Assumption | Why it matters |
 |:-:|---|---|
 | A1 | **Login must not redirect.** Users sign in inside our own app screens; the app posts credentials to an API. | Rules out authorization code + PKCE, the only standard OAuth 2.1 user flow. |
-| A2 | **Only first-party clients log users in** — Banffpay's own web and mobile apps. No third-party app signs users in "with Banffpay". | First-party apps may collect the password directly; third-party apps must never see it (that is what redirect flows are for). |
+| A2 | **Only first-party clients log users in** — pay's own web and mobile apps. No third-party app signs users in "with pay". | First-party apps may collect the password directly; third-party apps must never see it (that is what redirect flows are for). |
 | A3 | **Login payloads must be end-to-end encrypted** (RSA-OAEP-256 + AES-256-GCM on top of TLS). | A hosted OAuth login page posts plain form data over TLS; our E2E envelope would not apply. |
 | A4 | **Token consumers are our own services**, validating via `/oauth2/jwks`. | Any OAuth2 resource server can verify our tokens; no client registration needed for that. |
-| A5 | **No single sign-on** across multiple, separately deployed Banffpay apps is required yet. | SSO needs a central login session, which is what an Authorization Server provides. |
+| A5 | **No single sign-on** across multiple, separately deployed pay apps is required yet. | SSO needs a central login session, which is what an Authorization Server provides. |
 | A6 | **No partner / machine-to-machine access** through this service yet. | Partners need the OAuth client-credentials grant at a standard `/oauth2/token` endpoint. |
 | A7 | **Session controls are a product requirement**: refresh-token reuse detection that revokes the whole login, a 30-day absolute session lifetime, and at most 5 concurrent sessions per user. | Spring Authorization Server provides none of these out of the box; they would have to be rebuilt as extensions. |
 | A8 | **The team accepts ownership** of the issuance code (rotation, revocation, session limits) — reviewed, tested, and kept current. | The trade-off of not using a framework-maintained issuer. |
@@ -96,7 +96,7 @@ The result would be **more custom code than today, wrapped around SAS**, while l
    - Tokens signed by Spring's `JwtEncoder` (Nimbus, RS256) with keys from the PKCS#12 keystore.
    - Validation by Spring's OAuth2 Resource Server plus an active-session check per request.
    - Rotation, reuse detection, absolute lifetime and session limits implemented in `SessionService`.
-2. **Publish keys at `/oauth2/jwks`** so any Banffpay service validates tokens the standard OAuth2 way.
+2. **Publish keys at `/oauth2/jwks`** so any pay service validates tokens the standard OAuth2 way.
 3. **Add Spring Authorization Server later only where OAuth's standard flows apply** — partner/machine-to-machine access (client credentials), introspection, and SSO — sharing the same signing keys.
 
 ---
@@ -128,7 +128,7 @@ The result would be **more custom code than today, wrapped around SAS**, while l
 |---|---|
 | We own the security of the issuance code | Small, single-purpose classes; unit tests; this ADR; dependency scanning; periodic security review |
 | No standard `/oauth2/token`, `/oauth2/revoke`, `/oauth2/introspect`, OpenID discovery | Not needed under A2–A6; add SAS alongside when they are |
-| Standard OAuth client libraries can't drive our login | First-party clients use the provided clients (`docs/frontend/banffpayAuthClient.ts`, `tools/E2EClient.java`) |
+| Standard OAuth client libraries can't drive our login | First-party clients use the provided clients (`docs/frontend/payAuthClient.ts`, `tools/E2EClient.java`) |
 | Password reaches our app's UI | Acceptable for first-party apps (A2); E2E encryption protects it beyond TLS (A3) |
 | An auditor may expect a standard Authorization Server | This ADR documents the reasoning; migration path below |
 
@@ -138,9 +138,9 @@ The result would be **more custom code than today, wrapped around SAS**, while l
 
 Re-open this decision if **any** of these happen:
 
-- [ ] A **third-party app** needs to sign users in with Banffpay accounts (A2).
+- [ ] A **third-party app** needs to sign users in with pay accounts (A2).
 - [ ] **Partners or merchants** need machine-to-machine tokens from this service (A6) → add SAS for client credentials alongside.
-- [ ] **Single sign-on** across several Banffpay apps is required (A5).
+- [ ] **Single sign-on** across several pay apps is required (A5).
 - [ ] Product accepts a **redirect-based login** (A1).
 - [ ] An **audit or regulator** requires a standard / certified Authorization Server (A9).
 - [ ] The team can no longer **own and review** the issuance code (A8).
