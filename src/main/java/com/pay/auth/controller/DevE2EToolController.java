@@ -3,8 +3,10 @@ package com.pay.auth.controller;
 import com.pay.auth.constant.ApiPaths;
 import com.pay.auth.dto.req.E2EDecryptToolRequest;
 import com.pay.auth.dto.req.E2EEncryptToolRequest;
+import com.pay.auth.dto.req.E2EProxyRequest;
 import com.pay.auth.dto.res.ApiResponse;
 import com.pay.auth.dto.res.E2EEncryptToolResponse;
+import com.pay.auth.dto.res.E2EProxyResponse;
 import com.pay.auth.exception.OperationNotAllowedException;
 import com.pay.auth.service.E2ETestToolService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,7 +41,15 @@ public class DevE2EToolController {
 
     public DevE2EToolController(E2ETestToolService toolService) {
         this.toolService = toolService;
-        log.warn("DEV E2E test endpoints enabled at {}/encrypt and {}/decrypt (dev profile only)", ApiPaths.DEV_E2E, ApiPaths.DEV_E2E);
+        log.warn("DEV E2E test endpoints enabled at {}/proxy, /encrypt, /decrypt (dev profile only)", ApiPaths.DEV_E2E);
+    }
+
+    /** Plain request in; encrypted round trip through the real endpoint; plain reply out. */
+    @PostMapping("/proxy")
+    public ResponseEntity<ApiResponse<E2EProxyResponse>> proxy(@Valid @RequestBody E2EProxyRequest request,
+                                                               HttpServletRequest http) {
+        requireLocalCaller(http);
+        return ResponseEntity.ok(ApiResponse.success(toolService.proxy(request), "Sent encrypted; reply decrypted"));
     }
 
     @PostMapping("/encrypt")

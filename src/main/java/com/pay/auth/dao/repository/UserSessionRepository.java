@@ -11,6 +11,7 @@ import com.pay.auth.constant.enums.RevocationReason;
 import com.pay.auth.dao.entity.UserSession;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,6 +31,9 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
     Optional<UserSession> findByRefreshTokenHashForUpdate(@Param("hash") String hash);
 
     boolean existsByAccessTokenJtiAndRevokedAtIsNull(String accessTokenJti);
+
+    /** Active (not revoked, not expired) sessions of a user, oldest first — for the session limit. */
+    List<UserSession> findByUser_IdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedAtAsc(UUID userId, Instant now);
 
     @Modifying(flushAutomatically = true)
     @Query("""

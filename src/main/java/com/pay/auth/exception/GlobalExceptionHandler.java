@@ -1,7 +1,11 @@
 package com.pay.auth.exception;
 
 import jakarta.validation.ConstraintViolationException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.List;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -22,7 +26,7 @@ import com.pay.auth.constant.enums.ErrorCode;
 import com.pay.auth.dto.res.ApiResponse;
 import com.pay.auth.dto.res.FieldViolation;
 
-import java.util.List;
+import io.micrometer.core.instrument.MeterRegistry;
 
 /**
  * Single translation point from exceptions to the API contract. Stack traces and internal
@@ -30,11 +34,16 @@ import java.util.List;
  */
 @Slf4j
 @RestControllerAdvice
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
+
+    /** auth.request.rejections{code=AUTH-xxxx}: E2E failures, bad credentials, access denied… for alerting. */
+    private final MeterRegistry meterRegistry;
 
     @ExceptionHandler(BaseException.class)
     public ResponseEntity<ApiResponse<Void>> handleDomain(BaseException ex) {
         ErrorCode code = ex.getErrorCode();
+        meterRegistry.counter("auth.request.rejections", "code", code.getCode()).increment();
         if (code.getStatus().is5xxServerError()) {
             log.error("Request failed code={} detail={}", code.getCode(), ex.getMessage(), ex);
         } else {

@@ -55,6 +55,10 @@ public class UserSession extends BaseEntity {
     @Column(name = "expires_at", nullable = false, updatable = false)
     private Instant expiresAt;
 
+    /** When the whole login (family) ends, regardless of refreshes. */
+    @Column(name = "family_expires_at", nullable = false, updatable = false)
+    private Instant familyExpiresAt;
+
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
@@ -63,7 +67,8 @@ public class UserSession extends BaseEntity {
     private RevocationReason revocationReason;
 
     public static UserSession open(User user, UUID familyId, String accessTokenJti, String refreshTokenHash,
-                                   ClientContext client, Instant accessExpiresAt, Instant expiresAt) {
+                                   ClientContext client, Instant accessExpiresAt, Instant expiresAt,
+                                   Instant familyExpiresAt) {
         UserSession session = new UserSession();
         session.user = user;
         session.familyId = familyId;
@@ -73,6 +78,7 @@ public class UserSession extends BaseEntity {
         session.userAgent = client.userAgent();
         session.accessExpiresAt = accessExpiresAt;
         session.expiresAt = expiresAt;
+        session.familyExpiresAt = familyExpiresAt;
         return session;
     }
 
@@ -82,6 +88,10 @@ public class UserSession extends BaseEntity {
 
     public boolean isExpired(Instant now) {
         return !expiresAt.isAfter(now);
+    }
+
+    public boolean isFamilyExpired(Instant now) {
+        return !familyExpiresAt.isAfter(now);
     }
 
     public void revoke(RevocationReason reason, Instant now) {

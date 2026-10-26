@@ -1,9 +1,5 @@
 package com.pay.auth.service.impl;
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.pay.auth.config.properties.JwtProperties;
 import com.pay.auth.constant.enums.RevocationReason;
 import com.pay.auth.dao.entity.User;
@@ -18,9 +14,13 @@ import com.pay.auth.model.ClientContext;
 import com.pay.auth.model.IssuedTokens;
 import com.pay.auth.service.SessionService;
 import com.pay.auth.service.TokenService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -36,7 +36,9 @@ public class SessionServiceImpl implements SessionService {
     @Override
     @Transactional
     public IssuedTokens openSession(User user, ClientContext client) {
-        return issueInFamily(user, UUID.randomUUID(), client);
+        Instant now = clock.instant();
+        enforceSessionLimit(user.getId(), now);
+        return issueInFamily(user, UUID.randomUUID(), now.plus(jwtProperties.sessionAbsoluteTtl()), client);
     }
 
     /**
@@ -59,6 +61,10 @@ public class SessionServiceImpl implements SessionService {
             }
             throw new InvalidTokenException("refresh token revoked: " + current.getRevocationReason());
         }
+        if (current.isFamilyExpired(now)) {
+            current.revoke(RevocationReason.SESSION_EXPIRED, now);
+            throw new InvalidTokenException("session reached its absolute lifetime");
+        }
         if (current.isExpired(now)) {
             throw new InvalidTokenException("refresh token expired");
         }
@@ -71,7 +77,7 @@ public class SessionServiceImpl implements SessionService {
         }
 
         current.revoke(RevocationReason.ROTATED, now);
-        IssuedTokens tokens = issueInFamily(user, current.getFamilyId(), client);
+        IssuedTokens tokens = issueInFamily(user, current.getFamilyId(), current.getFamilyExpiresAt(), client);
         return new AuthenticatedSession(user, tokens);
     }
 
@@ -93,12 +99,25 @@ public class SessionServiceImpl implements SessionService {
         return sessionRepository.existsByAccessTokenJtiAndRevokedAtIsNull(jti);
     }
 
-    private IssuedTokens issueInFamily(User user, UUID familyId, ClientContext client) {
+    /**
+     * Keeps at most maxActiveSessions logins per user by closing the oldest. Bounds how many
+     * stolen-but-unnoticed sessions can exist, and keeps the session table small.
+     */
+    private void enforceSessionLimit(UUID userId, Instant now) {
+        List<UserSession> active = sessionRepository.findByUser_IdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedAtAsc(userId, now);
+        int excess = active.size() - jwtProperties.maxActiveSessions() + 1;   // +1 for the session about to open
+        for (int i = 0; i < excess; i++) {
+            active.get(i).revoke(RevocationReason.SESSION_LIMIT, now);
+        }
+    }
+
+    private IssuedTokens issueInFamily(User user, UUID familyId, Instant familyExpiresAt, ClientContext client) {
         Instant now = clock.instant();
         String jti = UUID.randomUUID().toString();
         AccessToken accessToken = tokenService.issueAccessToken(user, jti, now);
         String refreshToken = tokenService.newRefreshToken();
-        Instant refreshExpiresAt = now.plus(jwtProperties.refreshTokenTtl());
+        // A refresh token never outlives its login's absolute lifetime
+        Instant refreshExpiresAt = min(now.plus(jwtProperties.refreshTokenTtl()), familyExpiresAt);
 
         UserSession session = UserSession.open(
                 userRepository.getReferenceById(user.getId()),
@@ -106,10 +125,15 @@ public class SessionServiceImpl implements SessionService {
                 jti,
                 tokenService.hashRefreshToken(refreshToken),
                 client,
-                accessToken.expiresAt(),
-                refreshExpiresAt);
+                min(accessToken.expiresAt(), familyExpiresAt),
+                refreshExpiresAt,
+                familyExpiresAt);
         sessionRepository.save(session);
 
         return new IssuedTokens(accessToken.value(), accessToken.expiresAt(), refreshToken, refreshExpiresAt);
+    }
+
+    private static Instant min(Instant a, Instant b) {
+        return a.isBefore(b) ? a : b;
     }
 }
