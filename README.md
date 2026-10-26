@@ -16,9 +16,11 @@
 [Security model](#security-model) ·
 [Env variables](#environment-variables) ·
 [Flows](#how-the-flows-work) ·
+[Front end](#front-end-integration) ·
 [API](#api-reference) ·
 [Testing](#testing) ·
-[Troubleshooting](#troubleshooting)
+[Troubleshooting](#troubleshooting) ·
+[Decisions](#architecture-decisions)
 
 </div>
 
@@ -187,7 +189,9 @@ EE-Security-Auth-Service/
 │   ├── E2EClient.java              # encrypted test client
 │   └── pay-Auth-E2E.postman_collection.json
 ├── docs/
-│   └── e2e-client-example.js       # encryption flow for web/JS clients
+│   ├── adr/ADR-001-token-issuance.md   # why no full OAuth Authorization Server
+│   ├── frontend/payAuthClient.ts  # production front-end client (TypeScript)
+│   └── e2e-client-example.js       # minimal JS example of the flow
 └── src/main/
     ├── java/com/pay/auth/
     │   ├── AuthServiceApplication.java
@@ -958,6 +962,81 @@ Expect `Loaded JWT signing and payload encryption keys from keystore`.
 
 ---
 
+## Front-end integration
+
+The server **refuses** unencrypted calls to protected endpoints (`AUTH-4002`), so a front end can't accidentally send plain text — it simply won't work until it encrypts. Use the ready-made client in [`docs/frontend/payAuthClient.ts`](docs/frontend/payAuthClient.ts) (zero dependencies, browser WebCrypto).
+
+### 1. Allow the front end's origin
+
+Add the app's exact origin to `CORS_ALLOWED_ORIGINS` (dev already allows `http://localhost:3000` and `http://localhost:5173`):
+
+```dotenv
+CORS_ALLOWED_ORIGINS=https://app.pay.com,https://admin.pay.com
+```
+
+The service already allows the `X-E2E-*` request headers and exposes `X-E2E-Encrypted` to browsers.
+
+### 2. Serve the app over HTTPS
+
+WebCrypto only works in a secure context — `https://` or `http://localhost`. On plain `http://` the client throws immediately.
+
+### 3. Use the client
+
+```ts
+import { createAuthClient, AuthApiError } from "./payAuthClient";
+
+export const auth = createAuthClient({
+  baseUrl: import.meta.env.VITE_AUTH_URL,          // e.g. https://auth.pay.com
+  onSessionExpired: () => (window.location.href = "/login"),
+});
+
+try {
+  await auth.signup({ email, password, firstName, lastName });
+  const session = await auth.login({ email, password });   // tokens stored automatically
+  const me = await auth.me();                               // encrypted, Bearer added automatically
+  const users = await auth.request("GET", "/api/v1/admin/users?page=0&size=20", undefined, { auth: true });
+  await auth.logout();
+} catch (e) {
+  if (e instanceof AuthApiError) {
+    // e.code: AUTH-4010, AUTH-4230 …   e.fieldErrors: validation messages   e.correlationId: for support
+  }
+}
+```
+
+What it handles for you:
+
+| Concern | Behaviour |
+|---|---|
+| Encryption | Fresh AES-256 key + nonce per call; body encrypted, response decrypted and integrity-checked |
+| Plain-text fallback | **Rejected** — an unencrypted success response throws `CLIENT-PLAINTEXT` |
+| Server key rotation / restart | `AUTH-4004` → refetches the public key and retries once |
+| Expired access token | `AUTH-4011` → refreshes once and retries |
+| Concurrent refreshes | Single-flight — parallel 401s share one refresh, so one-time refresh tokens are never reused (which would revoke the login) |
+| Failed refresh | Clears tokens and calls `onSessionExpired` |
+
+### 4. Verify in the browser
+
+Open DevTools → **Network**, click a call to `/api/v1/auth/login`:
+
+- **Request headers** contain `X-E2E-Key`, `X-E2E-Key-Id`, `X-E2E-Timestamp`, `X-E2E-Nonce`.
+- **Payload** is only `{"iv":"…","data":"…"}` — no email or password visible.
+- **Response headers** contain `X-E2E-Encrypted: true`, and the response body is `{"iv","data"}`.
+
+If you can read the password anywhere in the Network tab, encryption isn't in use.
+
+### 5. Token storage
+
+The default `memoryTokenStore()` keeps tokens in memory only — the safest option against XSS, at the cost of logging in again after a page reload. If you pass your own `TokenStore` that writes to `localStorage`/`sessionStorage`, any XSS bug can steal the refresh token, so pair it with a strict Content-Security-Policy. (A future option is moving the refresh token into an `HttpOnly` cookie server-side.)
+
+> [!IMPORTANT]
+> E2E protects data **between** the browser and the service — through proxies, gateways and logs. It does not protect against malicious code running **in** the page, which can read data before encryption. XSS prevention (CSP, escaping, dependency hygiene) is still essential.
+
+### Mobile apps
+
+Android and iOS clients follow the same five steps as [`tools/E2EClient.java`](tools/E2EClient.java): RSA/ECB/OAEPWithSHA-256AndMGF1Padding (Android) or `SecKeyAlgorithm.rsaEncryptionOAEPSHA256` (iOS) for the key, AES-256-GCM with a 12-byte IV and the same AAD strings for the body.
+
+---
+
 ## API reference
 
 Base URL `http://localhost:8080`. Endpoints marked 🔒 are E2E encrypted.
@@ -998,6 +1077,17 @@ Encrypted requests carry `X-E2E-Key`, `X-E2E-Key-Id`, `X-E2E-Timestamp`, `X-E2E-
 | `AUTH-5030` | Hashing capacity full | Retry after `Retry-After` |
 | `ConnectException` in the client | Service not running | Start it; check `/actuator/health` |
 | DEBUG logs missing after a rename | Old package in `logging.level.*` | Update to the new package |
+
+---
+
+## Architecture decisions
+
+| ADR | Decision |
+|---|---|
+| [ADR-001 — Token issuance](docs/adr/README.md) | Self-issued OAuth2-standard JWTs from an encrypted, redirect-free login API, instead of a full OAuth Authorization Server. Lists the assumptions this depends on and when to revisit. |
+
+> [!NOTE]
+> **Why not a full OAuth Authorization Server?** Users log in **without redirects** and over **end-to-end encrypted** payloads. OAuth 2.1 has no standard redirect-free user login (the password grant was removed), so Spring Authorization Server would need a custom grant plus custom client authentication — more custom code than today. Tokens are still OAuth2-standard (RS256 JWT + `/oauth2/jwks`) and validated by Spring's OAuth2 Resource Server. See ADR-001 for the full assumptions and revisit triggers.
 
 ---
 
