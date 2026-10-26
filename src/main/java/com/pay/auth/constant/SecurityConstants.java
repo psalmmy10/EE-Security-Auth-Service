@@ -23,13 +23,7 @@ public final class SecurityConstants {
             ApiPaths.JWKS,
             ApiPaths.DEV_E2E + "/**",   // controller exists only in dev; 404 elsewhere
             "/actuator/health",
-
-                 // Swagger documentation — development/testing
-            "/swagger-ui.html",
-            "/swagger-ui/**",
-            "/v3/api-docs/**",
-            "/e2e-swagger.html"
-            
+            "/actuator/prometheus"   // staging/prod serve actuator on the internal management port only
     };
 
     private SecurityConstants() {

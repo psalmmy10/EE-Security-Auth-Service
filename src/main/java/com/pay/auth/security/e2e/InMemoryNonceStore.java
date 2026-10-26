@@ -1,10 +1,10 @@
 package com.pay.auth.security.e2e;
 
+import com.pay.auth.config.properties.E2EProperties;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
-import com.pay.auth.config.properties.E2EProperties;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -15,9 +15,11 @@ import java.util.concurrent.ConcurrentMap;
 /**
  * Lock-free (ConcurrentHashMap, no synchronized → no virtual-thread pinning).
  * Bounded to prevent memory exhaustion; fails CLOSED when full.
+ * Correct for ONE instance only — with several instances use app.security.state-store=redis.
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "app.security", name = "state-store", havingValue = "memory", matchIfMissing = true)
 public class InMemoryNonceStore implements NonceStore {
 
     private final ConcurrentMap<String, Instant> seen = new ConcurrentHashMap<>();
