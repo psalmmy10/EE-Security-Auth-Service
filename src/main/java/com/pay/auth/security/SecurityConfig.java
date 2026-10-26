@@ -55,11 +55,6 @@ public class SecurityConfig {
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final CorsProperties corsProperties;
 
-
-    List<String> exposedHeaders = new ArrayList<>(List.of(
-                SecurityConstants.HEADER_E2E_ENCRYPTED,
-                SecurityConstants.HEADER_CORRELATION_ID
-        ));
     
 
     @Bean
