@@ -31,7 +31,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.util.List;
 
 /**
- * RS256 signing. The public half is published at /oauth2/jwks so downstream Banffpay services
+ * RS256 signing. The public half is published at /oauth2/jwks so downstream pay services
  * can validate tokens as standard OAuth2 resource servers without sharing any secret.
  */
 @Configuration
