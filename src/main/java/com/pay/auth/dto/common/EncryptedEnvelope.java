@@ -1,6 +1,7 @@
 package com.pay.auth.dto.common;
 
 import org.springframework.util.StringUtils;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
  * Wire format for encrypted request and response bodies.
@@ -10,6 +11,7 @@ import org.springframework.util.StringUtils;
  */
 public record EncryptedEnvelope(String iv, String data) {
 
+    @JsonIgnore
     public boolean isComplete() {
         return StringUtils.hasText(iv) && StringUtils.hasText(data);
     }
