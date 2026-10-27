@@ -1,6 +1,7 @@
 package com.pay.auth.service.impl;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -36,6 +37,7 @@ import java.util.UUID;
  * Any change to status or roles revokes the target's sessions, so stale authorities in
  * already-issued JWTs stop working immediately rather than at expiry.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserAdministrationServiceImpl implements UserAdministrationService {
@@ -54,19 +56,25 @@ public class UserAdministrationServiceImpl implements UserAdministrationService 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<UserResponse> listUsers(int page, int size) {
-        return PageResponse.from(userRepository.findAll(PageRequest.of(page, size, DEFAULT_SORT)).map(userMapper::toResponse));
+        PageResponse<UserResponse> result = PageResponse.from(
+                userRepository.findAll(PageRequest.of(page, size, DEFAULT_SORT)).map(userMapper::toResponse));
+        log.debug("Listed users (page={}, size={}, returned={})", page, size, result.content().size());
+        return result;
     }
 
     @Override
     @Transactional(readOnly = true)
     public UserResponse getUser(UUID userId) {
-        return userMapper.toResponse(load(userId));
+        UserResponse response = userMapper.toResponse(load(userId));
+        log.debug("Fetched user (userId={})", userId);
+        return response;
     }
 
     @Override
     @Transactional
     public UserResponse updateStatus(UUID actorId, UUID userId, UpdateUserStatusRequest request, ClientContext client) {
         if (actorId.equals(userId)) {
+            log.warn("Status change rejected: administrator attempted to change own status (actorId={})", actorId);
             throw new OperationNotAllowedException("administrators cannot change their own status");
         }
         User user = load(userId);
@@ -77,6 +85,8 @@ public class UserAdministrationServiceImpl implements UserAdministrationService 
         }
         publish(AuditEventType.USER_STATUS_CHANGED, user, client,
                 "from=" + previous + " to=" + request.status() + " by=" + actorId);
+        log.info("User status changed (userId={}, from={}, to={}, actorId={})",
+                userId, previous, request.status(), actorId);
         return userMapper.toResponse(user);
     }
 
@@ -85,6 +95,7 @@ public class UserAdministrationServiceImpl implements UserAdministrationService 
     public UserResponse assignRole(UUID actorId, UUID userId, RoleName roleName, ClientContext client) {
         User user = load(userId);
         if (user.hasRole(roleName)) {
+            log.debug("Assign role skipped: user already has role (userId={}, role={})", userId, roleName);
             return userMapper.toResponse(user);
         }
         Role role = roleRepository.findByName(roleName)
@@ -92,6 +103,7 @@ public class UserAdministrationServiceImpl implements UserAdministrationService 
         user.assignRole(role);
         sessionService.revokeAllForUser(userId, RevocationReason.ROLE_CHANGED);
         publish(AuditEventType.ROLE_ASSIGNED, user, client, "role=" + roleName + " by=" + actorId);
+        log.info("Role assigned (userId={}, role={}, actorId={})", userId, roleName, actorId);
         return userMapper.toResponse(user);
     }
 
@@ -99,18 +111,23 @@ public class UserAdministrationServiceImpl implements UserAdministrationService 
     @Transactional
     public UserResponse revokeRole(UUID actorId, UUID userId, RoleName roleName, ClientContext client) {
         if (actorId.equals(userId) && roleName == RoleName.ADMIN) {
+            log.warn("Role revoke rejected: administrator attempted to revoke own ADMIN role (actorId={})", actorId);
             throw new OperationNotAllowedException("administrators cannot revoke their own ADMIN role");
         }
         User user = load(userId);
         if (!user.hasRole(roleName)) {
+            log.debug("Revoke role skipped: user does not have role (userId={}, role={})", userId, roleName);
             return userMapper.toResponse(user);
         }
         if (user.getRoles().size() == 1) {
+            log.warn("Role revoke rejected: user must retain at least one role (userId={}, role={}, actorId={})",
+                    userId, roleName, actorId);
             throw new OperationNotAllowedException("a user must retain at least one role");
         }
         user.revokeRole(roleName);
         sessionService.revokeAllForUser(userId, RevocationReason.ROLE_CHANGED);
         publish(AuditEventType.ROLE_REVOKED, user, client, "role=" + roleName + " by=" + actorId);
+        log.info("Role revoked (userId={}, role={}, actorId={})", userId, roleName, actorId);
         return userMapper.toResponse(user);
     }
 
@@ -120,6 +137,7 @@ public class UserAdministrationServiceImpl implements UserAdministrationService 
     public boolean ensureBootstrapAdmin(String email, String rawPassword, String firstName, String lastName) {
         String normalised = email.trim().toLowerCase(Locale.ROOT);
         if (userRepository.existsByEmail(normalised)) {
+            log.info("Bootstrap admin skipped: user already exists (email={})", normalised);
             return false;
         }
         Role userRole = roleRepository.findByName(RoleName.USER).orElseThrow(() -> new IllegalStateException("USER role missing"));
@@ -127,6 +145,7 @@ public class UserAdministrationServiceImpl implements UserAdministrationService 
         User admin = userRepository.save(User.register(normalised, passwordEncoder.encode(rawPassword),
                 firstName, lastName, Set.of(userRole, adminRole)));
         publish(AuditEventType.ADMIN_BOOTSTRAPPED, admin, null, null);
+        log.info("Bootstrap admin created (userId={}, email={})", admin.getId(), normalised);
         return true;
     }
 
