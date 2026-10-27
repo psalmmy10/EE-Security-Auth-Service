@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -37,6 +38,7 @@ import java.util.UUID;
  * Method-level @PreAuthorize replaces (not merges with) class-level rules in Spring Security,
  * so each method states role AND permission explicitly.
  */
+@Slf4j
 @E2EEncrypted
 @RestController
 @RequestMapping(ApiPaths.ADMIN_USERS)
@@ -51,12 +53,14 @@ public class AdminController {
     public ResponseEntity<ApiResponse<PageResponse<UserResponse>>> listUsers(
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        log.debug("HTTP 200 list users (page={}, size={})", page, size);
         return ResponseEntity.ok(ApiResponse.success(userAdministrationService.listUsers(page, size), "Users retrieved"));
     }
 
     @GetMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN') and hasAuthority('USER_READ')")
     public ResponseEntity<ApiResponse<UserResponse>> getUser(@PathVariable UUID userId) {
+        log.debug("HTTP 200 get user (userId={})", userId);
         return ResponseEntity.ok(ApiResponse.success(userAdministrationService.getUser(userId), "User retrieved"));
     }
 
@@ -68,6 +72,7 @@ public class AdminController {
                                                                   HttpServletRequest http) {
         UserResponse user = userAdministrationService.updateStatus(
                 SecurityUtil.userId(jwt), userId, request, RequestUtil.clientContext(http));
+        log.info("HTTP 200 update user status (userId={}, status={})", userId, request.status());
         return ResponseEntity.ok(ApiResponse.success(user, "User status updated"));
     }
 
@@ -79,6 +84,7 @@ public class AdminController {
                                                                 HttpServletRequest http) {
         UserResponse user = userAdministrationService.assignRole(
                 SecurityUtil.userId(jwt), userId, request.role(), RequestUtil.clientContext(http));
+        log.info("HTTP 200 assign role (userId={}, role={})", userId, request.role());
         return ResponseEntity.ok(ApiResponse.success(user, "Role assigned"));
     }
 
@@ -90,6 +96,7 @@ public class AdminController {
                                                                 HttpServletRequest http) {
         UserResponse user = userAdministrationService.revokeRole(
                 SecurityUtil.userId(jwt), userId, role, RequestUtil.clientContext(http));
+        log.info("HTTP 200 revoke role (userId={}, role={})", userId, role);
         return ResponseEntity.ok(ApiResponse.success(user, "Role revoked"));
     }
 }

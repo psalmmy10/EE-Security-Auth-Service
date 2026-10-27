@@ -15,6 +15,7 @@ import com.pay.auth.model.IssuedTokens;
 import com.pay.auth.service.SessionService;
 import com.pay.auth.service.TokenService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SessionServiceImpl implements SessionService {
@@ -38,7 +40,10 @@ public class SessionServiceImpl implements SessionService {
     public IssuedTokens openSession(User user, ClientContext client) {
         Instant now = clock.instant();
         enforceSessionLimit(user.getId(), now);
-        return issueInFamily(user, UUID.randomUUID(), now.plus(jwtProperties.sessionAbsoluteTtl()), client);
+        IssuedTokens tokens = issueInFamily(user, UUID.randomUUID(), now.plus(jwtProperties.sessionAbsoluteTtl()), client);
+        log.info("Session opened (userId={}, accessExpiresAt={}, refreshExpiresAt={})",
+                user.getId(), tokens.accessTokenExpiresAt(), tokens.refreshTokenExpiresAt());
+        return tokens;
     }
 
     /**
@@ -57,15 +62,22 @@ public class SessionServiceImpl implements SessionService {
         if (current.isRevoked()) {
             if (current.getRevocationReason() == RevocationReason.ROTATED) {
                 sessionRepository.revokeFamily(current.getFamilyId(), RevocationReason.REUSE_DETECTED, now);
+                log.warn("Refresh token reuse detected; token family revoked (userId={}, familyId={})",
+                        userId, current.getFamilyId());
                 throw new TokenReuseDetectedException(userId);
             }
+            log.warn("Refresh rejected: token already revoked (userId={}, reason={})",
+                    userId, current.getRevocationReason());
             throw new InvalidTokenException("refresh token revoked: " + current.getRevocationReason());
         }
         if (current.isFamilyExpired(now)) {
             current.revoke(RevocationReason.SESSION_EXPIRED, now);
+            log.warn("Refresh rejected: session reached absolute lifetime (userId={}, familyId={})",
+                    userId, current.getFamilyId());
             throw new InvalidTokenException("session reached its absolute lifetime");
         }
         if (current.isExpired(now)) {
+            log.warn("Refresh rejected: refresh token expired (userId={})", userId);
             throw new InvalidTokenException("refresh token expired");
         }
 
@@ -73,11 +85,13 @@ public class SessionServiceImpl implements SessionService {
                 .orElseThrow(() -> new InvalidTokenException("session user no longer exists"));
         if (!user.canAuthenticate(now)) {
             current.revoke(RevocationReason.ACCOUNT_INACTIVE, now);
+            log.warn("Refresh rejected: account can no longer authenticate (userId={})", userId);
             throw new InvalidTokenException("account can no longer authenticate");
         }
 
         current.revoke(RevocationReason.ROTATED, now);
         IssuedTokens tokens = issueInFamily(user, current.getFamilyId(), current.getFamilyExpiresAt(), client);
+        log.debug("Refresh token rotated (userId={}, familyId={})", userId, current.getFamilyId());
         return new AuthenticatedSession(user, tokens);
     }
 
@@ -85,12 +99,14 @@ public class SessionServiceImpl implements SessionService {
     @Transactional
     public void revokeByAccessTokenJti(String jti, RevocationReason reason) {
         sessionRepository.revokeByAccessTokenJti(jti, reason, clock.instant());
+        log.info("Session revoked by access-token JTI (reason={})", reason);
     }
 
     @Override
     @Transactional
     public void revokeAllForUser(UUID userId, RevocationReason reason) {
         sessionRepository.revokeAllActiveForUser(userId, reason, clock.instant());
+        log.info("All active sessions revoked (userId={}, reason={})", userId, reason);
     }
 
     @Override
@@ -106,6 +122,10 @@ public class SessionServiceImpl implements SessionService {
     private void enforceSessionLimit(UUID userId, Instant now) {
         List<UserSession> active = sessionRepository.findByUser_IdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedAtAsc(userId, now);
         int excess = active.size() - jwtProperties.maxActiveSessions() + 1;   // +1 for the session about to open
+        if (excess > 0) {
+            log.info("Active-session limit reached; evicting oldest sessions (userId={}, active={}, maxActive={}, evicting={})",
+                    userId, active.size(), jwtProperties.maxActiveSessions(), excess);
+        }
         for (int i = 0; i < excess; i++) {
             active.get(i).revoke(RevocationReason.SESSION_LIMIT, now);
         }

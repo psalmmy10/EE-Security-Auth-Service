@@ -27,6 +27,10 @@ import com.pay.auth.model.IssuedTokens;
 import com.pay.auth.service.AuthService;
 import com.pay.auth.service.LoginAttemptService;
 import com.pay.auth.service.SessionService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -54,7 +58,9 @@ import java.util.UUID;
  * transaction, so a ~250 ms CPU-bound hash never holds one of the 20 pooled JDBC connections.
  * Short transactions are opened explicitly with {@link TransactionTemplate} only around DB work.
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
@@ -69,30 +75,23 @@ public class AuthServiceImpl implements AuthService {
 
     private final AuthenticationManager authenticationManager;
 
-    public AuthServiceImpl(UserRepository userRepository, RoleRepository roleRepository,
-                           PasswordEncoder passwordEncoder, SessionService sessionService,
-                           LoginAttemptService loginAttemptService, UserMapper userMapper,
-                           ApplicationEventPublisher events, TransactionTemplate transactionTemplate, Clock clock,
-                           AuthenticationManager authenticationManager) {
-        this.userRepository = userRepository;
-        this.roleRepository = roleRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.sessionService = sessionService;
-        this.loginAttemptService = loginAttemptService;
-        this.userMapper = userMapper;
-        this.events = events;
-        this.transactionTemplate = transactionTemplate;
-        this.clock = clock;
-        this.authenticationManager = authenticationManager;
-    }
 
+    @SuppressWarnings("null")
     @Override
     public UserResponse signup(SignupRequest request, ClientContext client) {
         String email = normaliseEmail(request.email());
+        log.info("Signup request received (email={}, firstName={}, lastName={}, client={})",
+                email, maskPii(request.firstName()), maskPii(request.lastName()), client);
+                
         // Hash first, even for duplicate emails: equal timing, and no connection held while hashing.
         String passwordHash = passwordEncoder.encode(request.password());
-        User saved = transactionTemplate.execute(status -> persistNewUser(email, passwordHash, request));
+
+        User saved = transactionTemplate.execute(
+                        status -> persistNewUser(email, passwordHash, request)
+                    );
+
         publish(AuditEventType.SIGNUP_SUCCESS, saved.getId(), email, client, null);
+        log.info("Signup succeeded (userId={}, email={})", saved.getId(), email);
         return userMapper.toResponse(saved);
     }
 
@@ -103,6 +102,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse login(LoginRequest request, ClientContext client) {
         String email = normaliseEmail(request.email());
+        log.info("Login request received (email={}, client={})", email, client);
         User user;
         try {
             Authentication result = authenticationManager.authenticate(
@@ -112,39 +112,51 @@ public class AuthServiceImpl implements AuthService {
             recordFailedLogin(email, client);
             throw new AuthenticationFailedException("bad credentials");
         } catch (LockedException ex) {                     // only reachable with the correct password
+            log.warn("Login rejected: account locked (email={})", email);
             throw new AccountLockedException("account locked");
         } catch (DisabledException ex) {                   // only reachable with the correct password
+            log.warn("Login rejected: account disabled (email={})", email);
             throw new AccountInactiveException("account disabled");
         } catch (InternalAuthenticationServiceException ex) {
+            log.error("Authentication backend failure during login (email={})", email, ex);
             throw new IllegalStateException("authentication backend failure", ex.getCause());
         }
 
         loginAttemptService.recordSuccess(user.getId());
         IssuedTokens tokens = sessionService.openSession(user, client);
         publish(AuditEventType.LOGIN_SUCCESS, user.getId(), email, client, null);
+        log.info("Login succeeded (userId={}, email={})", user.getId(), email);
         return toAuthResponse(user, tokens);
     }
 
     private void recordFailedLogin(String email, ClientContext client) {
         Optional<UUID> userId = userRepository.findIdByEmail(email);
         if (userId.isEmpty()) {
+            log.warn("Login failed: unknown principal (email={})", email);
             publish(AuditEventType.LOGIN_FAILURE, null, email, client, "unknown principal");
             return;
         }
         boolean lockedNow = loginAttemptService.recordFailure(userId.get());
+        log.warn("Login failed: bad credentials (userId={}, email={})", userId.get(), email);
         publish(AuditEventType.LOGIN_FAILURE, userId.get(), email, client, "bad credentials");
         if (lockedNow) {
+            log.warn("Account locked after failed-attempt threshold reached (userId={}, email={})", userId.get(), email);
             publish(AuditEventType.ACCOUNT_LOCKED, userId.get(), email, client, "failed-attempt threshold reached");
         }
     }
 
     @Override
     public AuthResponse refresh(RefreshTokenRequest request, ClientContext client) {
+        // Never log the raw refresh token — only that one was supplied and its length.
+        log.info("Refresh request received (client={}, refreshTokenPresent={}",
+                client, request.refreshToken() != null);
         try {
             AuthenticatedSession session = sessionService.rotate(request.refreshToken(), client);
             publish(AuditEventType.TOKEN_REFRESHED, session.user().getId(), session.user().getEmail(), client, null);
+            log.info("Refresh succeeded (userId={})", session.user().getId());
             return toAuthResponse(session.user(), session.tokens());
         } catch (TokenReuseDetectedException ex) {
+            log.warn("Refresh token reuse detected; token family revoked (userId={})", ex.getUserId());
             publish(AuditEventType.TOKEN_REUSE_DETECTED, ex.getUserId(), null, client, "token family revoked");
             throw ex;
         }
@@ -152,14 +164,20 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void logout(UUID userId, String accessTokenJti, ClientContext client) {
+        // JTIs identify the session but are sensitive — log presence only.
+        log.info("Logout request received (userId={}, client={}, accessTokenJtiPresent={})",
+                userId, client, accessTokenJti != null);
         sessionService.revokeByAccessTokenJti(accessTokenJti, RevocationReason.LOGOUT);
         publish(AuditEventType.LOGOUT, userId, null, client, null);
+        log.info("Logout succeeded (userId={})", userId);
     }
 
     @Override
     public void logoutAll(UUID userId, ClientContext client) {
+        log.info("Logout-all request received (userId={}, client={})", userId, client);
         sessionService.revokeAllForUser(userId, RevocationReason.LOGOUT_ALL);
         publish(AuditEventType.LOGOUT_ALL, userId, null, client, null);
+        log.info("Logout-all succeeded (userId={})", userId);
     }
 
     private User persistNewUser(String email, String passwordHash, SignupRequest request) {
@@ -173,6 +191,7 @@ public class AuthServiceImpl implements AuthService {
             return userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException ex) {
             // Concurrent signup with the same email lost the race against the unique constraint.
+            log.warn("Signup lost unique-constraint race on email (email={})", email);
             throw new RegistrationConflictException("unique constraint violation on email", ex);
         }
     }
@@ -190,4 +209,14 @@ public class AuthServiceImpl implements AuthService {
     static String normaliseEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
     }
+
+    /** Masks a name for logs, keeping only the first character. */
+    private static String maskPii(String value) {
+        if (value == null || value.isEmpty()) {
+            return "<empty>";
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? "<empty>" : trimmed.charAt(0) + "***";
+    }
+
 }

@@ -323,6 +323,8 @@ Two **separate** RSA-3072 key pairs — one signs JWTs, one decrypts E2E keys.
 | `keystore` | staging, prod (dev via `KEY_SOURCE=keystore`) | Loads a PKCS#12 file with aliases `jwt-signing` and `payload-encryption`. Refuses to start on wrong path/password, missing or duplicate alias, or keys under 3072 bits. |
 
 ```bash
+mkdir secrets
+
 keytool -genkeypair -alias jwt-signing        -keyalg RSA -keysize 3072 -validity 365 -dname "CN=auth-jwt" -storetype PKCS12 -keystore secrets/auth-keys.p12 -storepass "<password>" -keypass "<password>"
 keytool -genkeypair -alias payload-encryption -keyalg RSA -keysize 3072 -validity 365 -dname "CN=auth-e2e" -storetype PKCS12 -keystore secrets/auth-keys.p12 -storepass "<password>" -keypass "<password>"
 ```
