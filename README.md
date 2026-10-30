@@ -1,6 +1,6 @@
 <div align="center">
 
-# EE Security Auth Service
+# EE Pay Security Auth Service
 
 **Enterprise-grade authentication for pay — OAuth2/JWT, role-based access, and end-to-end encrypted payloads.**
 
