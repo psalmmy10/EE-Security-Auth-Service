@@ -19,7 +19,8 @@ import java.io.IOException;
  * Rejects any request that did not arrive over HTTPS (app.security.require-https=true in staging/prod).
  * Behind a load balancer, TLS ends at the proxy; with server.forward-headers-strategy=framework,
  * Spring's ForwardedHeaderFilter (which runs first) turns X-Forwarded-Proto into request.isSecure().
- * Health checks are exempt so an internal load-balancer probe over plain HTTP still works.
+ * Exempt: health checks (internal load-balancer probes) and /oauth2/jwks — public keys only, fetched
+ * over the internal network by the API gateway and other services to validate tokens.
  * HSTS (set by SecurityConfig) then tells browsers never to try plain HTTP again.
  */
 @Slf4j
@@ -38,7 +39,8 @@ public class HttpsEnforcementFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !requireHttps || request.isSecure() || request.getRequestURI().startsWith("/actuator/health");
+        String uri = request.getRequestURI();
+        return !requireHttps || request.isSecure() || uri.startsWith("/actuator/health") || uri.equals("/oauth2/jwks");
     }
 
     @Override
