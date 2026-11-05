@@ -13,6 +13,7 @@ import com.pay.auth.dto.req.RefreshTokenRequest;
 import com.pay.auth.dto.req.SignupRequest;
 import com.pay.auth.dto.res.AuthResponse;
 import com.pay.auth.dto.res.UserResponse;
+import com.pay.auth.security.BoundedPasswordEncoder;
 import com.pay.auth.security.UserPrincipal;
 import com.pay.auth.event.AuthAuditEvent;
 import com.pay.auth.exception.AccountInactiveException;
@@ -65,7 +66,8 @@ public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final PasswordEncoder passwordEncoder;
+//    private final PasswordEncoder passwordEncoder;
+    private final BoundedPasswordEncoder passwordEncoder;
     private final SessionService sessionService;
     private final LoginAttemptService loginAttemptService;
     private final UserMapper userMapper;
