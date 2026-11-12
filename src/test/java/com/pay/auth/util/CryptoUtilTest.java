@@ -1,4 +1,4 @@
-package com.banffpay.auth.util;
+package com.pay.auth.util;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
