@@ -1,4 +1,4 @@
-package com.banffpay.auth.security;
+package com.pay.auth.security;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.password.PasswordEncoder;

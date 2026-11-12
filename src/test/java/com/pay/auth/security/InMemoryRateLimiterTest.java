@@ -1,4 +1,4 @@
-package com.banffpay.auth.security;
+package com.pay.auth.security;
 
 import com.pay.auth.security.ratelimit.InMemoryRateLimiter;
 import com.pay.auth.security.ratelimit.RateLimitDecision;

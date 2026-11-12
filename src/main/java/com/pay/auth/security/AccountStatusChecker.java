@@ -9,6 +9,7 @@ import org.springframework.security.core.userdetails.UserDetailsChecker;
  * Account-status check, run AFTER the password is verified (see AuthenticationConfig).
  * Spring's default runs it BEFORE, which would tell someone without the password that an
  * account exists and is locked or disabled.
+ * testing intellij
  */
 public class AccountStatusChecker implements UserDetailsChecker {
 
